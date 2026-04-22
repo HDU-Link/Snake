@@ -14,13 +14,14 @@
       class="game-canvas"
       tabindex="0"
       @keydown="handleKeydown"
+      @click="focusCanvas"
     ></canvas>
 
     <div class="game-controls">
-      <button @click="startGame" :disabled="gameRunning">
-        {{ gameRunning ? '游戏中' : '开始游戏' }}
+      <button @click="startGame" :disabled="gameRunning && !gamePaused">
+        {{ gameRunning && !gamePaused ? '游戏中' : '开始游戏' }}
       </button>
-      <button @click="pauseGame" :disabled="!gameRunning">
+      <button @click="togglePause" :disabled="!gameRunning || gameOver">
         {{ gamePaused ? '继续' : '暂停' }}
       </button>
       <button @click="resetGame">重置</button>
@@ -34,18 +35,20 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+import { GameController } from '../game/GameController'
+import type { Direction } from '../game/Snake'
 
-// 游戏配置
-const GRID_SIZE = 20 // 20x20 网格
-const CELL_SIZE = 20 // 每个格子20px
-const canvasSize = GRID_SIZE * CELL_SIZE // 400px
-const INITIAL_SPEED = 150 // 初始速度(ms)
+const GRID_SIZE = 20
+const CELL_SIZE = 20
+const canvasSize = GRID_SIZE * CELL_SIZE
+const INITIAL_SPEED = 150
 
-// 响应式数据
-const canvasRef = ref(null)
-let ctx = null
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+let ctx: CanvasRenderingContext2D | null = null
+let gameController: GameController | null = null
+let gameLoop: number | null = null
 
 const score = ref(0)
 const highScore = ref(0)
@@ -53,135 +56,31 @@ const gameRunning = ref(false)
 const gamePaused = ref(false)
 const gameOver = ref(false)
 
-// 游戏状态
-let snake = [
-  { x: 10, y: 10 },
-  { x: 9, y: 10 },
-  { x: 8, y: 10 },
-  { x: 7, y: 10 }
-]
-let food = { x: 15, y: 10 }
-let direction = 'RIGHT'
-let nextDirection = 'RIGHT'
-let gameLoop = null
-let currentSpeed = INITIAL_SPEED
-
-// 方向映射
-const directionMap = {
-  'UP': { x: 0, y: -1 },
-  'DOWN': { x: 0, y: 1 },
-  'LEFT': { x: -1, y: 0 },
-  'RIGHT': { x: 1, y: 0 }
-}
-
-// 反向方向（防止180度转弯）
-const oppositeDirection = {
-  'UP': 'DOWN',
-  'DOWN': 'UP',
-  'LEFT': 'RIGHT',
-  'RIGHT': 'LEFT'
-}
-
-// 初始化画布
-onMounted(() => {
-  const canvas = canvasRef.value
-  ctx = canvas.getContext('2d')
-  canvas.focus()
-  loadHighScore()
-  drawGame() // 绘制初始状态
-})
-
-// 绘制游戏
-const drawGame = () => {
-  if (!ctx) return
-  
-  // 清空画布
-  ctx.fillStyle = '#1a1a2e'
-  ctx.fillRect(0, 0, canvasSize, canvasSize)
-  
-  // 绘制网格
-  drawGrid()
-  
-  // 绘制食物
-  drawFood()
-  
-  // 绘制蛇
-  drawSnake()
-}
-
-// 绘制网格
-const drawGrid = () => {
-  ctx.strokeStyle = '#16213e'
-  ctx.lineWidth = 0.5
-  
-  for (let i = 0; i <= GRID_SIZE; i++) {
-    ctx.beginPath()
-    ctx.moveTo(i * CELL_SIZE, 0)
-    ctx.lineTo(i * CELL_SIZE, canvasSize)
-    ctx.stroke()
-    
-    ctx.beginPath()
-    ctx.moveTo(0, i * CELL_SIZE)
-    ctx.lineTo(canvasSize, i * CELL_SIZE)
-    ctx.stroke()
-  }
-}
-
-// 绘制蛇
-const drawSnake = () => {
-  snake.forEach((segment, index) => {
-    const isHead = index === 0
-    const gradient = ctx.createLinearGradient(
-      segment.x * CELL_SIZE,
-      segment.y * CELL_SIZE,
-      (segment.x + 1) * CELL_SIZE,
-      (segment.y + 1) * CELL_SIZE
-    )
-    
-    if (isHead) {
-      gradient.addColorStop(0, '#4ecdc4')
-      gradient.addColorStop(1, '#44bdae')
-    } else {
-      gradient.addColorStop(0, '#2ecc71')
-      gradient.addColorStop(1, '#27ae60')
-    }
-    
-    ctx.fillStyle = gradient
-    ctx.fillRect(
-      segment.x * CELL_SIZE,
-      segment.y * CELL_SIZE,
-      CELL_SIZE - 1,
-      CELL_SIZE - 1
-    )
-    
-    // 蛇的眼睛（头部）
-    if (isHead) {
-      ctx.fillStyle = 'white'
-      const eyeSize = 3
-      const eyeOffset = 5
-      
-      if (direction === 'RIGHT') {
-        ctx.fillRect(segment.x * CELL_SIZE + CELL_SIZE - eyeOffset, segment.y * CELL_SIZE + 5, eyeSize, eyeSize)
-        ctx.fillRect(segment.x * CELL_SIZE + CELL_SIZE - eyeOffset, segment.y * CELL_SIZE + CELL_SIZE - 8, eyeSize, eyeSize)
-      } else if (direction === 'LEFT') {
-        ctx.fillRect(segment.x * CELL_SIZE + 2, segment.y * CELL_SIZE + 5, eyeSize, eyeSize)
-        ctx.fillRect(segment.x * CELL_SIZE + 2, segment.y * CELL_SIZE + CELL_SIZE - 8, eyeSize, eyeSize)
-      } else if (direction === 'UP') {
-        ctx.fillRect(segment.x * CELL_SIZE + 5, segment.y * CELL_SIZE + 2, eyeSize, eyeSize)
-        ctx.fillRect(segment.x * CELL_SIZE + CELL_SIZE - 8, segment.y * CELL_SIZE + 2, eyeSize, eyeSize)
-      } else {
-        ctx.fillRect(segment.x * CELL_SIZE + 5, segment.y * CELL_SIZE + CELL_SIZE - 5, eyeSize, eyeSize)
-        ctx.fillRect(segment.x * CELL_SIZE + CELL_SIZE - 8, segment.y * CELL_SIZE + CELL_SIZE - 5, eyeSize, eyeSize)
-      }
-    }
+const initGameController = () => {
+  gameController = new GameController({
+    gridSize: GRID_SIZE,
+    cellSize: CELL_SIZE,
+    initialSpeed: INITIAL_SPEED
   })
 }
 
-// 绘制食物
+const syncState = () => {
+  if (!gameController) return
+  score.value = gameController.score
+  gameRunning.value = gameController.gameRunning
+  gamePaused.value = gameController.gamePaused
+  gameOver.value = gameController.gameOver
+}
+
 const drawFood = () => {
-  const centerX = food.x * CELL_SIZE + CELL_SIZE / 2
-  const centerY = food.y * CELL_SIZE + CELL_SIZE / 2
-  const radius = CELL_SIZE / 2 - 2 
+  if (!ctx || !gameController) return
+  
+  const food = gameController.foodPosition
+  const cellSize = CELL_SIZE
+  const centerX = food.x * cellSize + cellSize / 2
+  const centerY = food.y * cellSize + cellSize / 2
+  const radius = cellSize / 2 - 2
+  
   ctx.shadowBlur = 10
   ctx.shadowColor = '#e74c3c'
   
@@ -193,205 +92,79 @@ const drawFood = () => {
   ctx.shadowBlur = 0
 }
 
-// 生成新食物
-const generateFood = () => {
-  const maxAttempts = 1000
-  for (let i = 0; i < maxAttempts; i++) {
-    const newFood = {
-      x: Math.floor(Math.random() * GRID_SIZE),
-      y: Math.floor(Math.random() * GRID_SIZE)
+const drawSnake = () => {
+  if (!ctx || !gameController) return
+  
+  const snake = gameController.snakeBody
+  const direction = gameController.snakeDirection
+  const cellSize = CELL_SIZE
+  
+  snake.forEach((segment, index) => {
+    const isHead = index === 0
+    const gradient = ctx!.createLinearGradient(
+      segment.x * cellSize,
+      segment.y * cellSize,
+      (segment.x + 1) * cellSize,
+      (segment.y + 1) * cellSize
+    )
+    
+    if (isHead) {
+      gradient.addColorStop(0, '#4ecdc4')
+      gradient.addColorStop(1, '#44bdae')
+    } else {
+      gradient.addColorStop(0, '#2ecc71')
+      gradient.addColorStop(1, '#27ae60')
     }
     
-    // 确保食物不在蛇身上
-    const isOnSnake = snake.some(segment => segment.x === newFood.x && segment.y === newFood.y)
+    ctx!.fillStyle = gradient
+    ctx!.fillRect(
+      segment.x * cellSize,
+      segment.y * cellSize,
+      cellSize - 1,
+      cellSize - 1
+    )
     
-    if (!isOnSnake) {
-      food = newFood
-      return true
+    if (isHead) {
+      ctx!.fillStyle = 'white'
+      const eyeSize = 3
+      const eyeOffset = 5
+      
+      switch (direction) {
+        case 'RIGHT':
+          ctx!.fillRect(segment.x * cellSize + cellSize - eyeOffset, segment.y * cellSize + 5, eyeSize, eyeSize)
+          ctx!.fillRect(segment.x * cellSize + cellSize - eyeOffset, segment.y * cellSize + cellSize - 8, eyeSize, eyeSize)
+          break
+        case 'LEFT':
+          ctx!.fillRect(segment.x * cellSize + 2, segment.y * cellSize + 5, eyeSize, eyeSize)
+          ctx!.fillRect(segment.x * cellSize + 2, segment.y * cellSize + cellSize - 8, eyeSize, eyeSize)
+          break
+        case 'UP':
+          ctx!.fillRect(segment.x * cellSize + 5, segment.y * cellSize + 2, eyeSize, eyeSize)
+          ctx!.fillRect(segment.x * cellSize + cellSize - 8, segment.y * cellSize + 2, eyeSize, eyeSize)
+          break
+        case 'DOWN':
+          ctx!.fillRect(segment.x * cellSize + 5, segment.y * cellSize + cellSize - 5, eyeSize, eyeSize)
+          ctx!.fillRect(segment.x * cellSize + cellSize - 8, segment.y * cellSize + cellSize - 5, eyeSize, eyeSize)
+          break
+      }
     }
-  }
-  
-  // 如果几乎找不到位置（游戏胜利）
-  return false
+  })
 }
 
-// 移动蛇
-const moveSnake = () => {
-  // 更新方向
-  direction = nextDirection
+const drawPauseOverlay = () => {
+  if (!ctx) return
   
-  // 计算新头部位置
-  const move = directionMap[direction]
-  const newHead = {
-    x: snake[0].x + move.x,
-    y: snake[0].y + move.y
-  }
-  
-  // 检查是否吃到食物
-  const willEat = newHead.x === food.x && newHead.y === food.y
-  
-  // 插入新头部
-  snake.unshift(newHead)
-  
-  // 如果没有吃到食物，移除尾部
-  if (!willEat) {
-    snake.pop()
-  } else {
-    // 吃到食物，增加分数
-    score.value++
-    updateHighScore()
-    
-    // 增加速度（难度提升）
-    if (currentSpeed > 80) {
-      currentSpeed -= 3
-      resetGameLoop()
-    }
-    
-    // 生成新食物
-    const foodGenerated = generateFood()
-    if (!foodGenerated) {
-      // 胜利！蛇已经占满整个网格
-      gameOver.value = true
-      gameRunning.value = false
-      clearInterval(gameLoop)
-      return
-    }
-  }
-  
-  // 检查碰撞
-  if (checkCollision()) {
-    endGame()
-    return
-  }
-  
-  // 重新绘制
-  drawGame()
+  ctx.fillStyle = 'rgba(0,0,0,0.7)'
+  ctx.fillRect(0, 0, canvasSize, canvasSize)
+  ctx.fillStyle = 'white'
+  ctx.font = '20px Arial'
+  ctx.textAlign = 'center'
+  ctx.fillText('暂停中', canvasSize / 2, canvasSize / 2)
 }
 
-// 检查碰撞
-const checkCollision = () => {
-  const head = snake[0]
+const drawGameOverOverlay = () => {
+  if (!ctx) return
   
-  // 墙壁碰撞
-  if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
-    return true
-  }
-  
-  // 自身碰撞（跳过头部）
-  for (let i = 1; i < snake.length; i++) {
-    if (snake[i].x === head.x && snake[i].y === head.y) {
-      return true
-    }
-  }
-  
-  return false
-}
-
-// 键盘控制
-const handleKeydown = (e) => {
-  const keyMap = {
-    'ArrowUp': 'UP',
-    'ArrowDown': 'DOWN',
-    'ArrowLeft': 'LEFT',
-    'ArrowRight': 'RIGHT'
-  }
-  
-  const newDir = keyMap[e.key]
-  if (newDir && oppositeDirection[newDir] !== direction) {
-    nextDirection = newDir
-    e.preventDefault()
-  }
-  
-  // 空格键暂停/继续
-  if (e.key === ' ' || e.key === 'Space') {
-    e.preventDefault()
-    if (gameRunning.value && !gameOver.value) {
-      pauseGame()
-    }
-  }
-}
-
-// 开始游戏
-const startGame = () => {
-  if (gameRunning.value && !gamePaused.value) return
-  
-  if (gameOver.value) {
-    resetGame()
-  }
-  
-  gameRunning.value = true
-  gamePaused.value = false
-  gameOver.value = false
-  
-  resetGameLoop()
-  canvasRef.value.focus()
-}
-
-// 暂停游戏
-const pauseGame = () => {
-  if (!gameRunning.value || gameOver.value) return
-  
-  gamePaused.value = !gamePaused.value
-  
-  if (gamePaused.value) {
-    clearInterval(gameLoop)
-    gameLoop = null
-    // 显示暂停文字
-    ctx.fillStyle = 'rgba(0,0,0,0.7)'
-    ctx.fillRect(0, 0, canvasSize, canvasSize)
-    ctx.fillStyle = 'white'
-    ctx.font = '20px Arial'
-    ctx.textAlign = 'center'
-    ctx.fillText('暂停中', canvasSize / 2, canvasSize / 2)
-  } else {
-    resetGameLoop()
-  }
-}
-
-// 重置游戏循环
-const resetGameLoop = () => {
-  if (gameLoop) clearInterval(gameLoop)
-  gameLoop = setInterval(() => {
-    if (gameRunning.value && !gamePaused.value && !gameOver.value) {
-      moveSnake()
-    }
-  }, currentSpeed)
-}
-
-// 重置游戏
-const resetGame = () => {
-  clearInterval(gameLoop)
-  
-  // 重置变量
-  snake = [
-    { x: 10, y: 10 },
-    { x: 9, y: 10 },
-    { x: 8, y: 10 },
-    { x: 7, y: 10 }
-  ]
-  direction = 'RIGHT'
-  nextDirection = 'RIGHT'
-  score.value = 0
-  currentSpeed = INITIAL_SPEED
-  gameRunning.value = false
-  gamePaused.value = false
-  gameOver.value = false
-  
-  // 生成有效食物
-  generateFood()
-  
-  // 重新绘制
-  drawGame()
-}
-
-// 结束游戏
-const endGame = () => {
-  gameRunning.value = false
-  gameOver.value = true
-  clearInterval(gameLoop)
-  gameLoop = null
-  
-  // 显示游戏结束画面
   ctx.fillStyle = 'rgba(0,0,0,0.8)'
   ctx.fillRect(0, 0, canvasSize, canvasSize)
   ctx.fillStyle = '#e74c3c'
@@ -403,15 +176,136 @@ const endGame = () => {
   ctx.fillText(`得分: ${score.value}`, canvasSize / 2, canvasSize / 2 + 20)
 }
 
-// 更新最高分
-const updateHighScore = () => {
-  if (score.value > highScore.value) {
-    highScore.value = score.value
-    localStorage.setItem('snakeHighScore', highScore.value)
+const drawGame = () => {
+  if (!ctx || !gameController) return
+  
+  const map = gameController.mapInfo
+  
+  map.clearCanvas(ctx)
+  map.drawGrid(ctx)
+  
+  drawFood()
+  drawSnake()
+  
+  if (gamePaused.value) {
+    drawPauseOverlay()
+  } else if (gameOver.value) {
+    drawGameOverOverlay()
   }
 }
 
-// 加载最高分
+const gameTick = () => {
+  if (!gameController) return
+  
+  const continueGame = gameController.update()
+  syncState()
+  drawGame()
+  
+  if (gameController.gameOver) {
+    if (gameLoop) {
+      clearInterval(gameLoop)
+      gameLoop = null
+    }
+    updateHighScore()
+  }
+}
+
+const startGameLoop = () => {
+  if (gameLoop) {
+    clearInterval(gameLoop)
+    gameLoop = null
+  }
+  
+  if (gameController && gameController.gameRunning && !gameController.gameOver && !gameController.gamePaused) {
+    gameLoop = window.setInterval(() => {
+      gameTick()
+    }, gameController.currentSpeed)
+  }
+}
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (!gameController) return
+  
+  const keyMap: Record<string, Direction> = {
+    'ArrowUp': 'UP',
+    'ArrowDown': 'DOWN',
+    'ArrowLeft': 'LEFT',
+    'ArrowRight': 'RIGHT'
+  }
+  
+  const newDir = keyMap[e.key]
+  if (newDir) {
+    e.preventDefault()
+    gameController.setDirection(newDir)
+  }
+  
+  if (e.key === ' ' || e.key === 'Space') {
+    e.preventDefault()
+    if (gameRunning.value && !gameOver.value) {
+      togglePause()
+    }
+  }
+}
+
+const focusCanvas = () => {
+  canvasRef.value?.focus()
+}
+
+const startGame = () => {
+  if (!gameController) return
+  
+  if (!gameRunning.value || gameOver.value) {
+    gameController.start()
+    syncState()
+    startGameLoop()
+    drawGame()
+  } else if (gamePaused.value) {
+    togglePause()
+  }
+  
+  setTimeout(() => {
+    canvasRef.value?.focus()
+  }, 100)
+}
+
+const togglePause = () => {
+  if (!gameController) return
+  
+  gameController.togglePause()
+  syncState()
+  
+  if (!gamePaused.value) {
+    startGameLoop()
+  } else {
+    if (gameLoop) {
+      clearInterval(gameLoop)
+      gameLoop = null
+    }
+  }
+  drawGame()
+}
+
+const resetGame = () => {
+  if (!gameController) return
+  
+  if (gameLoop) {
+    clearInterval(gameLoop)
+    gameLoop = null
+  }
+  
+  gameController.reset()
+  syncState()
+  drawGame()
+  canvasRef.value?.focus()
+}
+
+const updateHighScore = () => {
+  if (score.value > highScore.value) {
+    highScore.value = score.value
+    localStorage.setItem('snakeHighScore', highScore.value.toString())
+  }
+}
+
 const loadHighScore = () => {
   const saved = localStorage.getItem('snakeHighScore')
   if (saved) {
@@ -419,9 +313,25 @@ const loadHighScore = () => {
   }
 }
 
-// 清理定时器
+onMounted(() => {
+  const canvas = canvasRef.value
+  if (!canvas) return
+  
+  ctx = canvas.getContext('2d')
+  initGameController()
+  loadHighScore()
+  drawGame()
+  
+  // 确保 canvas 可以获得焦点
+  canvas.setAttribute('tabindex', '0')
+  canvas.focus()
+})
+
 onUnmounted(() => {
-  if (gameLoop) clearInterval(gameLoop)
+  if (gameLoop) {
+    clearInterval(gameLoop)
+    gameLoop = null
+  }
 })
 </script>
 
