@@ -179,25 +179,18 @@ const drawSnake = () => {
 
 // 绘制食物
 const drawFood = () => {
-  ctx.fillStyle = '#e74c3c'
+  const centerX = food.x * CELL_SIZE + CELL_SIZE / 2
+  const centerY = food.y * CELL_SIZE + CELL_SIZE / 2
+  const radius = CELL_SIZE / 2 - 2 
   ctx.shadowBlur = 10
   ctx.shadowColor = '#e74c3c'
-  ctx.fillRect(
-    food.x * CELL_SIZE,
-    food.y * CELL_SIZE,
-    CELL_SIZE - 1,
-    CELL_SIZE - 1
-  )
-  ctx.shadowBlur = 0
   
-  // 添加内发光效果
-  ctx.fillStyle = '#ff6b6b'
-  ctx.fillRect(
-    food.x * CELL_SIZE + 4,
-    food.y * CELL_SIZE + 4,
-    CELL_SIZE - 9,
-    CELL_SIZE - 9
-  )
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+  ctx.fillStyle = '#e74c3c'
+  ctx.fill()
+  
+  ctx.shadowBlur = 0
 }
 
 // 生成新食物
@@ -463,7 +456,6 @@ onUnmounted(() => {
   border: 2px solid #4ecdc4;
   border-radius: 8px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-  cursor: pointer;
   outline: none;
 }
 

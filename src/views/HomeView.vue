@@ -9,16 +9,16 @@
           <span>方向键控制移动</span>
         </div>
         <div class="feature-item">
+          <span class="emoji">⏸️</span>
+          <span>空格键暂停/继续</span>
+        </div>
+        <div class="feature-item">
           <span class="emoji">⚡</span>
           <span>动态难度，速度递增</span>
         </div>
         <div class="feature-item">
           <span class="emoji">🏆</span>
           <span>最高分本地保存</span>
-        </div>
-        <div class="feature-item">
-          <span class="emoji">⏸️</span>
-          <span>空格键暂停/继续</span>
         </div>
       </div>
       <div>
