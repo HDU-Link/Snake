@@ -1,6 +1,5 @@
 <template>
   <div id="app">
-    <!-- 导航栏 -->
     <nav class="navbar">
       <ul>
         <li><router-link to="/">首页</router-link></li>
@@ -15,13 +14,18 @@
 <style scoped>
 .navbar {
   background-color: #2c3e50;
-  padding: 15px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
 }
 
 .navbar ul {
   list-style: none;
   display: flex;
-  gap: 20px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
   margin: 0;
   padding: 0;
 }
@@ -30,8 +34,7 @@
   color: white;
   text-decoration: none;
   font-weight: bold;
-  padding: 5px 10px;
-  border-radius: 4px;
+  padding: 20px;
   transition: all 0.3s;
 }
 
@@ -39,7 +42,6 @@
   background-color: #4ecdc4;
 }
 
-/* 激活路由的样式 */
 .router-link-active {
   background-color: #e74c3c;
   color: white;

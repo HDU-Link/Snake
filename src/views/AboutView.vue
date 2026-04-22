@@ -33,14 +33,15 @@ export default defineComponent({
 
 <style scoped>
 .about {
-  padding: 40px;
-  max-width: 800px;
+  padding: 20px;
+  max-width: 450px;
   margin: 0 auto;
 }
 
 h1 {
   color: #2c3e50;
   margin-bottom: 30px;
+  text-align: center;
 }
 
 h2 {

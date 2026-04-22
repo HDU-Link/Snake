@@ -40,14 +40,13 @@ export default defineComponent({
 
 <style scoped>
 .home {
-  min-height: 100vh;
+  max-height: calc(100vh - 3rem);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 40px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .logo {
@@ -59,16 +58,16 @@ export default defineComponent({
 .game-intro {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 20px;
-  padding: 40px 50px;
+  padding: 40px 60px;
   max-width: 500px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.6s ease-out;
 }
 
 h1 {
-  font-size: 42px;
+  font-size: 32px;
   color: #2c3e50;
-  margin-bottom: 15px;
+  margin-bottom: 0px;
 }
 
 .subtitle {
@@ -100,8 +99,7 @@ h1 {
 }
 
 .play-button {
-  display: inline-block;
-  margin-top: 20px;
+  margin: 20px;
   padding: 12px 30px;
   background: linear-gradient(135deg, #4ecdc4, #44bdae);
   color: white;

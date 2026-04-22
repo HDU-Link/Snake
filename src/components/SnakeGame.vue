@@ -1,7 +1,6 @@
 <template>
   <div class="snake-game">
     <div class="game-header">
-      <h2>贪吃蛇游戏 🐍</h2>
       <div class="score-board">
         <div>当前分数: <span class="score">{{ score }}</span></div>
         <div>最高分: <span class="high-score">{{ highScore }}</span></div>
